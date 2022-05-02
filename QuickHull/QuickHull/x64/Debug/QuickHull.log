@@ -1,0 +1,25 @@
+﻿  QuickHull.cpp
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(13): error C2143: syntax error: missing ';' before '<'
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(13): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(61): error C2065: 'hull': undeclared identifier
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(61): error C2228: left of '.insert' must have class/struct/union
+  c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(61): note: type is 'unknown-type'
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(62): error C2065: 'hull': undeclared identifier
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(62): error C2228: left of '.insert' must have class/struct/union
+  c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(62): note: type is 'unknown-type'
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(102): error C2065: 'hull': undeclared identifier
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(102): error C2228: left of '.empty' must have class/struct/union
+  c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(102): note: type is 'unknown-type'
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(104): error C2065: 'hull': undeclared identifier
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(104): error C2228: left of '.begin' must have class/struct/union
+  c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(104): note: type is 'unknown-type'
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(104): error C2228: left of '.first' must have class/struct/union
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(105): error C2065: 'hull': undeclared identifier
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(105): error C2228: left of '.begin' must have class/struct/union
+  c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(105): note: type is 'unknown-type'
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(105): error C2228: left of '.second' must have class/struct/union
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(106): error C2065: 'hull': undeclared identifier
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(106): error C2228: left of '.erase' must have class/struct/union
+  c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(106): note: type is 'unknown-type'
+c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(106): error C2228: left of '.begin' must have class/struct/union
+  c:\users\i848571\onedrive - sap se\documents\unisinos\tecnicas de otimizacao\técnicas de otimização_2\técnicas de otimização\quickhull\quickhull\quickhull.cpp(106): note: type is 'unknown-type'
