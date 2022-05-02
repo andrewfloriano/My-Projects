@@ -1,0 +1,5 @@
+﻿  ClosestPairOfPoints.cpp
+d:\unisinos\técnicas de otimização\closestpairofpoints\closestpairofpoints\closestpairofpoints.cpp(21): warning C4244: 'return': conversion from 'float' to 'int', possible loss of data
+d:\unisinos\técnicas de otimização\closestpairofpoints\closestpairofpoints\closestpairofpoints.cpp(28): warning C4244: 'return': conversion from 'float' to 'int', possible loss of data
+d:\unisinos\técnicas de otimização\closestpairofpoints\closestpairofpoints\closestpairofpoints.cpp(132): warning C4305: 'initializing': truncation from 'double' to 'float'
+  ClosestPairOfPoints.vcxproj -> D:\UNISINOS\Técnicas de Otimização\ClosestPairOfPoints\Debug\ClosestPairOfPoints.exe
