@@ -1,0 +1,35 @@
+MEGAZORD colete_de_couro 5 Wrecker 7 1 1 roda_de_latão 2
+#
+C3PO Ombrera 1 creaker 5 1 2 roda_de_latão 2
+#
+ATOM colete_de_cerãmica 3 Claptrap 3 2 2 Roda_primitiva 1
+#
+BRAINIAC destroços_de_carro 6 Blastretcosm 8 2 1 roda_de_latão 2
+#
+ASTROBOY Armadura_Balística 7 Pack_a_pounch 7 3 3 roda_de_latão 2
+#
+R2D2 Peitoral_de_bronze_fundido 8 Pack_a_pounch 7 3 3 roda_de_latão 2
+#
+BENDER Armadura_de_vidro_blindado 10 Topraygun 10 3 2 Pneu_Largo 5
+#
+EXTERMINATOR Armadura_de_ossos 12 Topraygun 10 3 2 Pneu_Largo 5
+#
+ELETRO_ROBOT Armadura_de_Adamantium 18 Balbi 20 3 2 Pneu_Largo 5
+Ì
+VAGNER
+creaker
+5
+1
+2
+colete_de_couro
+5
+roda_de_latão
+2
+24
+5
+5
+30
+6
+5
+0
+0

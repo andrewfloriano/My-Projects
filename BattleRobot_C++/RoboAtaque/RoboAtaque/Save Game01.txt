@@ -1,0 +1,35 @@
+SONY colete_de_couro 5 Wrecker 7 1 1 roda_de_latão 2
+#
+ATOM colete_de_cerãmica 3 creaker 5 1 2 roda_de_latão 2
+#
+ZEUS Ombrera 1 Claptrap 3 2 2 roda_de_latão 2
+#
+BLACKOUT Peitoral_de_bronze_fundido 8 Pack_a_pounch 7 3 3 Pneu_velho 3
+#
+ROBOCOP Armadura_Balística 7 Blastretcosm 8 2 1 Pneu_velho 3
+#
+SENTINELA Armadura_Balística 7 Blastretcosm 8 2 1 roda_de_latão 2
+#
+C3PO Armadura_de_ossos 12 Topraygun 10 3 2 Perna_de_saci 4
+#
+BUMBLEBEE Armadura_de_Niobio 15 dummer 15 2 1 Pneu_Largo 5
+#
+ELETRO_ROBOT Armadura_de_Adamantium 18 Balbi 20 3 2 Pneu_Largo 5
+Ì
+ANDREW
+Wrecker
+7
+1
+1
+colete_de_couro
+5
+roda_de_latão
+2
+23
+3
+5
+20
+4
+4
+0
+0

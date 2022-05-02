@@ -1,0 +1,5 @@
+Roda_primitiva 1
+roda_de_latão 2
+Pneu_velho 3
+Perna_de_saci 4
+Pneu_Largo 5

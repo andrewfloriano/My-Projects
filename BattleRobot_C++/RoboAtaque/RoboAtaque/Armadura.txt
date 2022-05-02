@@ -1,0 +1,10 @@
+Ombrera 1
+colete_de_cerãmica 3
+colete_de_couro 5
+destroços_de_carro 6
+Armadura_Balística 7
+Peitoral_de_bronze_fundido 8
+Armadura_de_vidro_blindado 10
+Armadura_de_ossos 12 
+Armadura_de_Niobio 15
+Armadura_de_Adamantium 18
