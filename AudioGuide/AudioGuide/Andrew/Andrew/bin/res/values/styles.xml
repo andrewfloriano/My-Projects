@@ -1,0 +1,17 @@
+<resources>
+
+
+    <style name="AppBaseTheme" parent="android:Theme.Light">
+
+    </style>
+
+    <!-- Application theme. -->
+    <style name="AppTheme" parent="AppBaseTheme">
+        
+    </style>
+    
+    <style name="SnapchatTheme" parent="@android:style/Theme.Holo" />
+
+    
+
+</resources>
