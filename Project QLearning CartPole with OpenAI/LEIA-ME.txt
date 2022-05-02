@@ -1,0 +1,1 @@
+Rodar programa Trabalho_GA_cartpole_QLearning.py no Python 3.0 ou superiores.
