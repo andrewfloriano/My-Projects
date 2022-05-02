@@ -1,0 +1,51 @@
+# Project: LD11
+# Makefile created by Dev-C++ 4.9.9.2
+
+CPP  = g++.exe -D__DEBUG__
+CC   = gcc.exe -D__DEBUG__
+WINDRES = windres.exe
+RES  = 
+OBJ  = main.o includes/debug.o includes/gameObj.o includes/timer.o includes/window.o includes/character.o includes/font.o includes/monster.o $(RES)
+LINKOBJ  = main.o includes/debug.o includes/gameObj.o includes/timer.o includes/window.o includes/character.o includes/font.o includes/monster.o $(RES)
+LIBS =  -L"C:/Dev-Cpp/lib" -mwindows -lmingw32 -lSDLmain -lSDL -lSDL_image -lSDL_mixer  -g3 
+INCS =  -I"C:/Dev-Cpp/include" 
+CXXINCS =  -I"C:/Dev-Cpp/lib/gcc/mingw32/3.4.2/include"  -I"C:/Dev-Cpp/include/c++/3.4.2/backward"  -I"C:/Dev-Cpp/include/c++/3.4.2/mingw32"  -I"C:/Dev-Cpp/include/c++/3.4.2"  -I"C:/Dev-Cpp/include" 
+BIN  = LD.exe
+CXXFLAGS = $(CXXINCS)   -g3
+CFLAGS = $(INCS)   -g3
+RM = rm -f
+
+.PHONY: all all-before all-after clean clean-custom
+
+all: all-before LD.exe all-after
+
+
+clean: clean-custom
+	${RM} $(OBJ) $(BIN)
+
+$(BIN): $(OBJ)
+	$(CPP) $(LINKOBJ) -o "LD.exe" $(LIBS)
+
+main.o: main.cpp
+	$(CPP) -c main.cpp -o main.o $(CXXFLAGS)
+
+includes/debug.o: includes/debug.cpp
+	$(CPP) -c includes/debug.cpp -o includes/debug.o $(CXXFLAGS)
+
+includes/gameObj.o: includes/gameObj.cpp
+	$(CPP) -c includes/gameObj.cpp -o includes/gameObj.o $(CXXFLAGS)
+
+includes/timer.o: includes/timer.cpp
+	$(CPP) -c includes/timer.cpp -o includes/timer.o $(CXXFLAGS)
+
+includes/window.o: includes/window.cpp
+	$(CPP) -c includes/window.cpp -o includes/window.o $(CXXFLAGS)
+
+includes/character.o: includes/character.cpp
+	$(CPP) -c includes/character.cpp -o includes/character.o $(CXXFLAGS)
+
+includes/font.o: includes/font.cpp
+	$(CPP) -c includes/font.cpp -o includes/font.o $(CXXFLAGS)
+
+includes/monster.o: includes/monster.cpp
+	$(CPP) -c includes/monster.cpp -o includes/monster.o $(CXXFLAGS)
