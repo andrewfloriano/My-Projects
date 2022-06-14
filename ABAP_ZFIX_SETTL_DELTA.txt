@@ -1,0 +1,1014 @@
+*&---------------------------------------------------------------------*
+*& Report  ZYHW_FIX_SETTL_DATA
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT zyhw_fix_settl_delta LINE-SIZE 120.
+*************************************
+*
+* This parallelized report looks for accounts with a specific error in
+* mass settlement. This error is characterized by wrong repayment
+* price items close to end of term, while the repayment receivables are
+* correct.
+*
+* Correction:
+* - Schedule additional billing correction
+* - Trigger settlement recalculation
+* - Earmark PD items for reversal
+*
+* MANUAL INSTRUCTIONS before running the report:
+*
+*  1. Create a new database table (customer package, namespace may be
+*     added):
+*      - Name          : ZPDITEMTOBEREV
+*      - Delivery Class: L
+*      - Components    :
+*        Field        KEY Data Element         Data Type Length
+*        CLIENT       X   MANDT
+*        RUNID        X   GUID_16
+*        CONTRACT_INT X   BCA_DTE_CONTRACT_INT
+*        REF_APPL         /FSPD/DTE_REF_APPL
+*        GROUP_OBJECT     /FSPD/DTE_GROUP_OBJECT
+*        ITEM_ID          /FSPD/DTE_ITEM_ID
+*        DATE_VALUE       /FSPD/DTE_VALDAT
+*        PROCESSED                             C         1
+*      - Index         :
+*        - Name             : 010
+*        - Short Description: MANDT, RUNID, ITEM_ID
+*        - Field Names      : MANDT, RUNID, ITEM_ID
+*
+*  2. Create a new function module (customer function group)
+*      - Name:          : ZYHW_UPDATE_ZPDITEMTOBEREV
+*      - Short Text     : Update Module for Table ZPDITEMTOBEREV
+*      - Processing Type: Update Module
+*      - Tables:
+*        Parameter Name          Typing Associated Type Optional
+*        T_TAB_PDITEMTOBEREV_INS LIKE   ZPDITEMTOBEREV
+*        T_TAB_PDITEMTOBEREV_UPD LIKE   ZPDITEMTOBEREV
+*      - Source code:
+*        IF NOT t_tab_pditemtoberev_ins[] IS INITIAL.
+*          INSERT zpditemtoberev FROM TABLE t_tab_pditemtoberev_ins.
+*        ENDIF.
+*        IF NOT t_tab_pditemtoberev_upd[] IS INITIAL.
+*          UPDATE zpditemtoberev FROM TABLE t_tab_pditemtoberev_upd.
+*        ENDIF.
+*
+*  3. On the selection texts tabstrip set the 'Dictionary Reference' flag for
+*     following entries:
+*      - ABPARE
+*      - ACINT
+*      - AVALDT
+*      - P_XSIMUL
+*      - P_XPANUM
+*      - P_IDEXT
+*     Enter the follwing manual selection text
+*      - ACORPD: Correct Payment Distribution
+*
+* 4. On the text symbols tabstrip enter the following texts:
+*      - 001: Additional Parameters
+*      - F02: Billing already scheduled
+*      - F03:	Package &1 processed
+*      - F04:	Settlement event created
+*      - F05:	Settlement event couldn't be created
+*      - F06:	Error at call bca_api_ev_acbal_init
+*      - F07:	Error at call bca_api_ev_acbal_create
+*      - F08:	Error at call bca_api_ev_acbal_create
+*      - F09:	Error at call bca_api_ev_acbal_set_bdc
+*      - F10:	Billing trigger set
+*      - F11:	Error at call bca_api_ev_acbal_set
+*      - F12:	Error at call bca_api_ev_acbal_save
+*      - F13:	Settlement already scheduled
+*      - F14:	Settlement to be corrected not found
+*      - F15:	Account hasn't been settled yet
+*      - F16: Couldn't find the last settlement
+*      - F17: PD items earmarked for reversal
+*      - F18: (RUNID = &1)
+* 5. Active all changes.
+*
+*
+************************************************************************
+TYPE-POOLS:
+  abap.
+TYPES:
+  BEGIN OF t_str_pp_own_param,
+************************************************************************
+*// define your parameter structure (field length max. 7)            \\*
+    bpare TYPE RANGE OF tbca_bpare-bpare,
+    cint  TYPE RANGE OF bca_trnover-contract_int,
+    valdt TYPE RANGE OF bca_trnover-date_value,
+    corpd TYPE xfeld,
+    runid TYPE guid_16,
+*\\                                                                  //*
+************************************************************************
+  END OF t_str_pp_own_param.
+
+* technical pp-if-screen
+INCLUDE fs_tb_pp_sif_top_generic.
+
+
+SELECTION-SCREEN BEGIN OF SCREEN 1010 AS SUBSCREEN .
+************************************************************************
+* // define your screen (same fields as param with beginning 'a')    \\*
+DATA:
+  l_dmy_bpare  TYPE tbca_bpare-bpare,
+  g_cint       TYPE bca_trnover-contract_int,
+  g_value_date TYPE bca_trnover-date_value.
+
+SELECT-OPTIONS:
+  abpare FOR l_dmy_bpare,"                         MODIF ID x01,
+  acint  FOR g_cint,
+  avaldt FOR g_value_date.
+PARAMETERS:
+  arunid TYPE guid_16 NO-DISPLAY,
+  acorpd TYPE xfeld AS CHECKBOX DEFAULT 'X'.
+
+*\\                                                                  //*
+************************************************************************
+
+SELECTION-SCREEN END OF SCREEN 1010.
+
+INITIALIZATION.
+* start pp-if
+  avaldt-low = '20150301'.
+  avaldt-high = '99991231'.
+  avaldt-option = 'BT'.
+  avaldt-sign = 'I'.
+  APPEND avaldt.
+  INCLUDE fs_tb_pp_sif_all_generic.
+
+************************************************************************
+* // process some checks at selection screen (using param)           \\*
+FORM checks_at_selection_screen
+  CHANGING
+    c_str_param              TYPE t_str_pp_own_param        "#EC *
+    c_flg_error_in_sel_data  TYPE xfeld.                    "#EC *
+
+** ...
+** check/change the data from your screen
+** ...
+*
+*  IF c_str_param-seldate IS INITIAL.
+**   use this macro to indicate errors
+**   (c_flg_error_in_sel_data will be set to 'X' and we exit subroutine)
+*    mac_error_in_sel_data '0T'
+*      010 'Please fill parameter ap_sdate (Date to)'
+*      space space space. "#EC *
+*  ENDIF.
+  CALL FUNCTION 'BANK_DISTRIBUTED_ID_CREATE'
+    IMPORTING
+      ev_guid_16 = c_str_param-runid.
+ENDFORM.                    "checks_at_selection_screen
+*\\                                                                  //*
+************************************************************************
+
+
+************************************************************************
+* // process your package (a commit-work will be raised outside!)    \\*
+FORM process_package                                        "#EC CALLED
+  USING
+    u_flg_simulation TYPE xfeld
+    u_package_no     TYPE bank_dte_pp_intervno
+    u_total_packages TYPE bank_dte_pp_cnt_packages
+    u_guid_from      TYPE guid_16
+    u_guid_to        TYPE guid_16
+    u_str_param      TYPE t_str_pp_own_param
+  CHANGING
+    e_cnt_due        TYPE i
+    e_cnt_success    TYPE i.                                "#EC NEEDED
+  DATA:
+    l_rwa_contract_int TYPE bca_str_contract_int_rng,
+    l_rng_contract_int TYPE bca_rng_contract_int,
+    l_rng_cint         TYPE RANGE OF bca_trnover-contract_int,
+    l_rwa_cint         LIKE LINE OF l_rng_cint,
+    l_tab_trnover      TYPE bca_tab_trnover_db,
+    l_str_trnover      TYPE bca_trnover,
+    l_sav_cint         TYPE bca_trnover-contract_int,
+    l_flg_skip_cint    TYPE xfeld,
+    l_str_contract     TYPE bca_str_asv_contract_dates,
+    l_tab_result_coll  TYPE bca_tab_calc_result_coll,
+    l_str_result_coll  TYPE bca_str_calc_result_coll,
+    l_str_res_sim_disp TYPE bca_str_calc_result_coll,
+    l_str_res_posted   TYPE bca_str_calc_result_coll,
+    l_value_tmstp      TYPE bca_dte_val_timestamp,
+    l_trn_amount_new   TYPE bca_dte_bl_amount,
+    l_cnt_sim          TYPE i,
+    l_cnt_succ         TYPE i,
+    l_cnt_due          TYPE i,
+    l_str_account      TYPE bca_str_cn_acct,
+    l_tas_account      TYPE bca_tas_cn_acct,
+    l_tas_trn_trigger  TYPE bca_tas_trnover_db,
+    l_msgv1            TYPE symsgv,
+    l_msgv2            TYPE symsgv,
+    l_msgv4            TYPE symsgv,
+    l_rc_bill          TYPE sysubrc,
+    l_rc_settl         TYPE sysubrc,
+    l_rc_pd            TYPE sysubrc,
+    l_dummy(1)         TYPE c.                              "#EC NEEDED
+
+  cl_bca_msg_log_srv=>s_reset_no_success_messages( ).
+  l_msgv1 = TEXT-f03.
+  REPLACE '&1' IN l_msgv1 WITH u_package_no.
+  READ TABLE u_str_param-cint INTO l_rwa_cint INDEX 1.
+  IF sy-tfill = 1 AND l_rwa_cint-option = 'EQ'.
+    IF l_rwa_cint-low BETWEEN u_guid_from AND u_guid_to.
+      APPEND l_rwa_cint TO l_rng_contract_int.
+    ELSE.
+      mac_log_msg 'S' '0T' 010 l_msgv1 space space space.
+      RETURN.
+    ENDIF.
+  ELSE.
+    l_rng_cint = u_str_param-cint[].
+    l_rwa_contract_int-low = u_guid_from.
+    l_rwa_contract_int-high = u_guid_to.
+    l_rwa_contract_int-sign = 'I'.
+    l_rwa_contract_int-option = 'BT'.
+    APPEND l_rwa_contract_int TO l_rng_contract_int.
+  ENDIF.
+  IF u_str_param-bpare IS INITIAL.
+    SELECT * FROM bca_contract AS t1
+      INNER JOIN bca_trnover AS t3
+        ON t1~contract_int = t3~contract_int
+      INTO CORRESPONDING FIELDS OF TABLE l_tab_trnover
+      WHERE t3~contract_int IN l_rng_contract_int
+        AND t3~contract_int IN l_rng_cint
+        AND t3~status = '01'
+        AND t3~turnover_class IN ('L021','L022')
+        AND t3~a_amount <> 0
+        AND t3~date_value IN u_str_param-valdt
+        AND t1~valid_to_real  =  '99991231235959' "last status
+        AND t1~status = '30' "active, used
+        AND t1~prodtype = if_am_pp_package_bca_cap=>con_prodtype_account.
+  ELSE.
+    SELECT * FROM bca_contract AS t1
+      INNER JOIN bca_trnover AS t3
+        ON t1~contract_int = t3~contract_int
+      INNER JOIN bca_cn_per_acbal AS t2
+        ON t1~contract_int = t2~contract_int
+      INTO CORRESPONDING FIELDS OF TABLE l_tab_trnover
+      WHERE t3~contract_int IN l_rng_contract_int
+        AND t3~contract_int IN l_rng_cint
+        AND t3~status = '01'
+        AND t2~bpare IN u_str_param-bpare
+        AND t3~turnover_class IN ('L021','L022')
+        AND t3~date_value IN u_str_param-valdt
+        AND t1~valid_to_real = '99991231235959' "last status
+        AND t1~status = '30' "active, used
+        AND t1~prodtype = if_am_pp_package_bca_cap=>con_prodtype_account.
+  ENDIF.
+  IF lines( l_tab_trnover ) = 0.
+    mac_log_msg 'S' '0T' 010 l_msgv1 space space space.
+    RETURN.
+  ENDIF.
+  " Only consider oldest billing item per account
+  SORT l_tab_trnover BY contract_int date_value.
+  DELETE ADJACENT DUPLICATES FROM l_tab_trnover
+    COMPARING contract_int date_value.
+  LOOP AT l_tab_trnover INTO l_str_trnover.
+    IF l_sav_cint <> l_str_trnover-contract_int.
+      CLEAR l_flg_skip_cint.
+      " Get new cashflow
+      l_str_contract-contract_int = l_str_trnover-contract_int.
+      l_str_contract-settlement_type = '001'.
+      CALL FUNCTION 'BCA_API_DETERM_CASH_FLOW'
+        EXPORTING
+          i_str_contract         = l_str_contract
+          i_no_bill_items        = con_true
+          i_min_recalc_from      = l_str_trnover-date_value
+        IMPORTING
+          e_tab_result_coll      = l_tab_result_coll
+        EXCEPTIONS
+          import_parameter_error = 1
+          preparation_failed     = 2
+          disbursement_failed    = 3
+          calculation_failed     = 4
+          transtype_failure      = 5
+          lock_failure           = 6
+          OTHERS                 = 7.
+      IF sy-subrc <> 0.
+        mac_log_msg sy-msgty sy-msgid sy-msgno
+          sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+        l_flg_skip_cint = abap_true.
+      ENDIF.
+      l_sav_cint = l_str_trnover-contract_int.
+    ENDIF.
+    IF l_flg_skip_cint = abap_true.
+      CONTINUE.
+    ENDIF.
+    " Find new version of old billing item
+    CLEAR:
+      l_str_result_coll,
+      l_str_res_sim_disp,
+      l_str_res_posted,
+      l_trn_amount_new,
+      l_cnt_sim.
+    CONVERT DATE l_str_trnover-date_value
+      TIME if_bca_calc_constants=>con_time_1200
+      INTO TIME STAMP l_value_tmstp
+      TIME ZONE if_bca_calc_constants=>con_timezone_utc.
+    LOOP AT l_tab_result_coll INTO l_str_result_coll
+      WHERE turnover_class =  l_str_trnover-turnover_class
+        AND value_tmstp    =  l_value_tmstp
+        AND waiver_flag    =  space.
+      IF l_str_result_coll-f_status
+           = if_bca_calc_constants=>con_status_simulated.
+        IF l_str_result_coll-f_display = abap_true.
+          l_str_res_sim_disp = l_str_result_coll.
+        ENDIF.
+        ADD 1 TO l_cnt_sim.
+      ELSE.
+        l_str_res_posted = l_str_result_coll.
+      ENDIF.
+    ENDLOOP.
+    "Two simulated flows - offsetting and new
+    CASE l_cnt_sim.
+      WHEN 0.
+        CONTINUE.
+      WHEN 1.
+        "Must be offsetting
+        l_str_res_sim_disp-wbwhr2 = l_str_res_posted-wbwhr2.
+      WHEN 2.
+        "Simulated not display relevant - unchanged
+        IF l_str_res_sim_disp-f_display IS INITIAL.
+          CONTINUE.
+        ENDIF.
+      WHEN OTHERS.
+        CONTINUE.
+    ENDCASE.
+    PERFORM adapt_res_amount
+      USING
+        l_str_res_sim_disp-bbwhr2
+        l_str_res_sim_disp-wbwhr2
+      CHANGING
+        l_trn_amount_new.
+    IF l_trn_amount_new = l_str_trnover-a_amount.
+      CONTINUE.
+    ENDIF.
+    " Changed amount or not found
+    CALL FUNCTION 'BCA_API_CN_ACCT_GET_DATA'
+      EXPORTING
+        i_contract_int = l_str_trnover-contract_int
+      IMPORTING
+        e_str_account  = l_str_account
+      EXCEPTIONS
+        not_found      = 0
+        OTHERS         = 0.
+    MESSAGE s010(0t) INTO l_dummy
+      WITH l_str_account-iban l_str_trnover-contract_int
+           l_str_trnover-date_value l_str_trnover-turnover_class.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    WRITE l_str_trnover-a_amount CURRENCY l_str_trnover-acur
+      TO l_msgv2 LEFT-JUSTIFIED.
+    WRITE l_trn_amount_new TO l_msgv4 CURRENCY l_str_res_sim_disp-wbwhr2
+      LEFT-JUSTIFIED.
+    MESSAGE s010(0t) INTO l_dummy
+      WITH l_str_account-iban l_msgv2 '-->' l_msgv4.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    INSERT l_str_trnover INTO TABLE l_tas_trn_trigger.
+    INSERT l_str_account INTO TABLE l_tas_account.
+    l_flg_skip_cint = abap_true.
+  ENDLOOP.
+  IF l_tas_trn_trigger[] IS INITIAL.
+    mac_log_msg 'S' '0T' 010 l_msgv1 space space space.
+    RETURN.
+  ENDIF.
+  IF u_flg_simulation = con_true.
+    ROLLBACK WORK.
+  ENDIF.
+  CALL FUNCTION 'BCA_API_BL_OPEN'
+    EXPORTING
+      i_flg_testrun   = u_flg_simulation
+      i_flg_inupdtask = con_true
+    EXCEPTIONS
+      technical_error = 1
+      OTHERS          = 99.
+  IF sy-subrc <> 0.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    mac_log_msg 'S' '0T' 010 l_msgv1 space space space.
+    RETURN.
+  ENDIF.
+  LOOP AT l_tas_trn_trigger INTO l_str_trnover.
+    CLEAR:
+      l_rc_bill,
+      l_rc_settl,
+      l_rc_pd.
+    READ TABLE l_tas_account INTO l_str_account
+      WITH KEY contract_int = l_str_trnover-contract_int.
+    PERFORM create_settl_event
+      USING
+        l_str_trnover-date_value
+        l_str_trnover-contract_int
+        l_str_account-iban
+        u_flg_simulation
+      CHANGING
+        l_rc_settl.
+    CASE l_rc_settl.
+      WHEN 0 OR 1.
+      WHEN 2.
+        MESSAGE i010(0t) INTO l_dummy
+          WITH l_str_account-iban TEXT-f05 space space.
+        mac_log_msg sy-msgty sy-msgid sy-msgno
+          sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDCASE.
+    IF l_rc_settl <> 2.
+      PERFORM trigger_billing
+        USING
+          l_str_trnover-contract_int
+          l_str_account-iban
+          l_str_trnover-date_value
+          u_flg_simulation
+        CHANGING
+          l_rc_bill.
+    ENDIF.
+    IF l_rc_settl <> 2 AND l_rc_bill <> 2.
+      IF u_str_param-corpd = abap_true.
+        l_rc_pd = 3.
+      ELSE.
+        PERFORM earmark_pd
+          USING
+            l_str_trnover-contract_int
+            l_str_account-iban
+            l_str_trnover-date_value
+            u_str_param
+            u_flg_simulation
+          CHANGING
+            l_rc_pd.
+      ENDIF.
+    ENDIF.
+    IF l_rc_bill <> 1 OR l_rc_settl <> 1
+    OR l_rc_pd = 0 OR l_rc_pd = 2.
+      ADD 1 TO l_cnt_due.
+    ENDIF.
+    IF ( l_rc_bill = 0 OR l_rc_settl = 0 OR l_rc_pd = 0 )
+    AND l_rc_bill <> 2 AND l_rc_settl <> 2 AND l_rc_pd <> 2.
+      ADD 1 TO l_cnt_succ.
+    ENDIF.
+  ENDLOOP.
+  IF u_flg_simulation IS INITIAL.
+    CALL FUNCTION 'BCA_API_BL_SAVE'
+      EXCEPTIONS
+        save_error = 1
+        OTHERS     = 2.
+    IF sy-subrc <> 0.
+      mac_log_msg sy-msgty sy-msgid sy-msgty
+        sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      mac_log_msg 'S' '0T' 010 l_msgv1 space space space.
+      RETURN.
+    ENDIF.
+  ENDIF.
+* use this macro for logging all messages (or standard appl-log-macros)
+  mac_log_msg 'S' '0T' 010 l_msgv1 space space space.
+* you can return counters for each package (if due > suc => RC = 4)
+  e_cnt_due     = l_cnt_due.
+  e_cnt_success = l_cnt_succ.
+ENDFORM.                    "process_package
+*\\                                                                  //*
+************************************************************************
+
+
+
+************************************************************************
+* // process event end of run (a commit-work will be raised outside!)\\*
+FORM process_end_of_run
+  USING
+    u_counter_due      TYPE bank_dte_mr_counter
+    u_counter_success  TYPE bank_dte_mr_counter
+    u_massrun_id       TYPE bank_dte_mr_massrun_id
+  CHANGING
+    c_rcd_appl         TYPE bank_dte_jc_rcd_appl.           "#EC *
+
+* ...
+* Implementation of this form is optional
+* If you do not need it, you can even delete this form
+* ...
+* ...
+* increase and/or react on mass run return code
+* NOTE: the return code can only be increased, if it is decreased
+* the new value will be ignored
+* ...
+
+ENDFORM.                    "process_end_of_run
+*\\
+*&---------------------------------------------------------------------*
+*&      Form  TRIGGER_BILLING
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->U_CONTRACT_INT  text
+*      -->U_DATE_FROM  text
+*      -->U_EXEC_DATE  text
+*      -->U_FLG_SIMULATION  text
+*      <--C_RC  text
+*----------------------------------------------------------------------*
+FORM trigger_billing
+  USING
+    u_contract_int   TYPE bca_dte_contract_int
+    u_iban           TYPE bca_dte_iban
+    u_date_value     TYPE bca_valdat_y
+    u_flg_simulation TYPE bank_boolean
+  CHANGING
+    c_rc             LIKE sy-subrc.
+  DATA:
+    l_rng_bl_category  TYPE bca_tab_rng_bl_category,
+    l_rwa_bl_category  TYPE bca_str_rng_bl_category,
+    l_tab_contract_int TYPE bca_tab_contract_int,
+    l_tab_bl_sched     TYPE bca_tab_bl_sched,
+    l_str_bl_sched     TYPE bca_str_bl_sched,
+    l_tab_bl_sched_h   TYPE bca_tab_bl_sched_hist,
+    l_ref_external     TYPE bca_dte_bl_ref_external,
+    l_dummy(1)         TYPE c.                              "#EC NEEDED
+  FIELD-SYMBOLS:
+    <l_str_contract_int> TYPE bca_str_contract_int,
+    <l_str_bl_sched_h>   TYPE bca_bl_sched_h.
+
+  CLEAR c_rc.
+  APPEND INITIAL LINE TO l_tab_contract_int
+    ASSIGNING <l_str_contract_int>.
+  <l_str_contract_int>-contract_int = u_contract_int.
+  l_rwa_bl_category-sign = 'I'.
+  l_rwa_bl_category-option = 'EQ'.
+  l_rwa_bl_category-low = '15'.
+  APPEND l_rwa_bl_category TO l_rng_bl_category.
+  CALL METHOD cl_bca_bl_al_process=>s_get_list_sched
+    EXPORTING
+      im_rng_bl_category  = l_rng_bl_category
+      im_tab_contract_int = l_tab_contract_int
+    IMPORTING
+      ex_tab_bl_sched     = l_tab_bl_sched.
+  READ TABLE l_tab_bl_sched INTO l_str_bl_sched INDEX 1.
+  IF sy-subrc = 0 AND l_str_bl_sched-date_from <= u_date_value.
+    c_rc = 1.
+    MESSAGE s010(0t) WITH u_iban TEXT-f02 space space INTO l_dummy.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+  CLEAR l_rng_bl_category[].
+  l_rwa_bl_category-low = '01'.
+  APPEND l_rwa_bl_category TO l_rng_bl_category.
+  l_rwa_bl_category-low = '02'.
+  APPEND l_rwa_bl_category TO l_rng_bl_category.
+  l_rwa_bl_category-low = '03'.
+  APPEND l_rwa_bl_category TO l_rng_bl_category.
+  l_rwa_bl_category-low = '04'.
+  APPEND l_rwa_bl_category TO l_rng_bl_category.
+  l_rwa_bl_category-low = '05'.
+  APPEND l_rwa_bl_category TO l_rng_bl_category.
+  l_rwa_bl_category-low = '06'.
+  APPEND l_rwa_bl_category TO l_rng_bl_category.
+  CALL METHOD cl_bca_bl_al_process=>s_get_list_sched_h
+    EXPORTING
+      im_rng_bl_category  = l_rng_bl_category
+      im_tab_contract_int = l_tab_contract_int
+    IMPORTING
+      ex_tab_bl_sched_h   = l_tab_bl_sched_h.
+  LOOP AT l_tab_bl_sched_h ASSIGNING <l_str_bl_sched_h>
+    WHERE date_from <= u_date_value
+      AND date_to   >= u_date_value.
+    l_ref_external = 'BILLING CORRECTION'.
+    CALL FUNCTION 'BCA_API_BL_SET_COMM'
+      EXPORTING
+        i_contract_int     = u_contract_int
+        i_ref_external     = l_ref_external
+        i_exec_date        = <l_str_bl_sched_h>-crea_date
+        i_activity         = '01'
+        i_bl_category      = '15'
+        i_flg_testrun      = u_flg_simulation
+        i_flg_inupdtask    = con_true
+        i_flg_corres       = con_false
+        i_flg_tev          = con_true
+        i_change_date_from = <l_str_bl_sched_h>-date_from
+      EXCEPTIONS
+        technical_error    = 1
+        action_failed      = 2
+        acct_locked        = 3
+        acct_unlocked      = 4
+        OTHERS             = 5.
+    IF sy-subrc <> 0.
+      c_rc = 2.
+      mac_log_msg sy-msgty sy-msgid sy-msgty
+        sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      RETURN.
+    ELSE.
+      MESSAGE s010(0t) WITH u_iban TEXT-f10 space space INTO l_dummy.
+      mac_log_msg sy-msgty sy-msgid sy-msgno
+        sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      EXIT.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.                    "trigger_billing
+*----------------------------------------------------------------------*
+*&      Form  ADAPT_RES_AMOUNT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->U_BBWHR2  text
+*      -->U_WBWHR2  text
+*      <--C_BL_AMOUNT_NEW  text
+*----------------------------------------------------------------------*
+FORM adapt_res_amount
+  USING
+    u_bbwhr2        TYPE tfmbbwhr2
+    u_wbwhr2        TYPE tfmwhrkond
+  CHANGING
+    c_bl_amount_new TYPE bca_dte_bl_amount.
+  DATA:
+    l_factor TYPE isoc_factor.
+
+  CALL FUNCTION 'CURRENCY_CONVERTING_FACTOR'
+    EXPORTING
+      currency          = u_wbwhr2
+    IMPORTING
+      factor            = l_factor
+    EXCEPTIONS
+      too_many_decimals = 1
+      OTHERS            = 2.
+  IF sy-subrc <> 0.
+    l_factor = 1.
+  ENDIF.
+  c_bl_amount_new = l_factor * u_bbwhr2.
+ENDFORM.                    " ADAPT_BILL_AMOUNT
+*&---------------------------------------------------------------------*
+*&      Form  CREATE_SETTL_EVENT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM create_settl_event
+  USING
+    u_value_date     TYPE bca_valdat_y
+    u_contract_int   TYPE bca_dte_contract_int
+    u_iban           TYPE bca_dte_iban
+    u_flg_simulation TYPE bank_boolean
+  CHANGING
+    c_rc             LIKE sy-subrc.
+  DATA:
+    l_str_ev_acbal_new TYPE bca_str_ev_acbal_ext,
+    l_tab_settle_data  TYPE bca_tab_bkk92,
+    l_str_settle_data  TYPE bca92,
+    l_value_tmstp      TYPE tzntstmps,
+    l_tab_ev_acbal_new TYPE bca_tab_ev_acbal_ext,
+    l_tab_ev_acbal_old TYPE bca_tab_ev_acbal_ext,
+    l_str_ev_acbal_old TYPE bca_str_ev_acbal_ext,
+    l_tab_ev_acbal_ext TYPE bca_tab_ev_acbal_ext,
+    l_str_ev_acbal_ext TYPE bca_str_ev_acbal_ext,
+    l_rc               TYPE sysubrc,
+    l_dummy(1)         TYPE c.                              "#EC NEEDED
+
+  CLEAR c_rc.
+  CONVERT DATE u_value_date
+    TIME if_bca_calc_constants=>con_time_1200
+    INTO TIME STAMP l_value_tmstp
+    TIME ZONE if_bca_calc_constants=>con_timezone_utc.
+  CALL FUNCTION 'BCA_ACBAL_BCA92_BUFFER_GET'
+    EXPORTING
+      i_contract_int    = u_contract_int
+      i_settlement_type = '001'
+    IMPORTING
+      e_tab_bca92       = l_tab_settle_data.
+  DELETE l_tab_settle_data WHERE settlement_rev = 'X'.
+  IF l_tab_settle_data[] IS INITIAL.
+    c_rc = 2.
+    MESSAGE e010(0t) WITH u_iban TEXT-f15 space space INTO l_dummy.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+***********************************************************************
+*    Find settlement period to be recalculated
+***********************************************************************
+  SORT l_tab_settle_data BY clos_per clos_nradd.
+  DELETE ADJACENT DUPLICATES FROM l_tab_settle_data
+    COMPARING clos_per.
+  READ TABLE l_tab_settle_data INTO l_str_settle_data
+    WITH KEY value_tmstp = l_value_tmstp.
+  IF sy-subrc <> 0.
+    c_rc = 2.
+    MESSAGE e010(0t) WITH u_iban TEXT-f14 space space INTO l_dummy.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+  l_str_ev_acbal_new-contract_int = u_contract_int.
+  l_str_ev_acbal_new-settlement_type = '001'.
+  l_str_ev_acbal_new-eventcatg = 'BDC'.
+  l_str_ev_acbal_new-action = '1'.
+  l_str_ev_acbal_new-start_date = l_str_settle_data-start_tmstp.
+  CALL FUNCTION 'BCA_COND_CLOSE_LAST_ENDDATE'
+    EXPORTING
+      i_contract_int    = u_contract_int
+      i_settlement_type = '001'
+    IMPORTING
+      e_end_tmstp       = l_str_ev_acbal_new-next_date
+      e_end_tmstp_post  = l_str_ev_acbal_new-settm_date
+      e_rc              = l_rc.
+  IF l_rc <> 0.
+    c_rc = 2.
+    MESSAGE e010(0t) WITH u_iban TEXT-f16 space space INTO l_dummy.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+***********************************************************************
+*    Check whether there exists an open event
+***********************************************************************
+  CALL FUNCTION 'BCA_API_EV_ACBAL_GET_BY_CN'
+    EXPORTING
+      i_contract_int    = u_contract_int
+      i_settlement_type = '001'
+      i_xdelete         = con_true
+    IMPORTING
+      e_tab_ev_acbal    = l_tab_ev_acbal_old
+    EXCEPTIONS
+      not_found         = 1
+      OTHERS            = 2.
+  IF sy-subrc = 0.
+    LOOP AT l_tab_ev_acbal_old INTO l_str_ev_acbal_old
+      WHERE settlement_type =  '001'
+        AND eventcatg       =  'BDC  '
+        AND start_date       <= l_str_ev_acbal_new-start_date.
+      c_rc = 1.
+      MESSAGE s010(0t) INTO l_dummy
+        WITH u_iban TEXT-f13 l_str_ev_acbal_old-start_date space.
+      mac_log_msg sy-msgty sy-msgid sy-msgno
+        sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      RETURN.
+    ENDLOOP.
+  ENDIF.
+**********************************************************************
+* Initialize ev acbal table
+***********************************************************************
+  CALL FUNCTION 'BCA_API_EV_ACBAL_INIT'
+    EXPORTING
+      i_contract_int = u_contract_int
+    EXCEPTIONS
+      not_found      = 1
+      OTHERS         = 2.
+  IF sy-subrc <> 0.
+    c_rc = 2.
+    MESSAGE e898(bca_basis) WITH u_iban TEXT-f06 INTO l_dummy.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+***************************************************************
+* Create events
+***************************************************************
+  APPEND l_str_ev_acbal_new TO l_tab_ev_acbal_new.
+  CALL FUNCTION 'BCA_API_EV_ACBAL_CREATE'
+    EXPORTING
+      i_tab_ev_acbal     = l_tab_ev_acbal_new
+    IMPORTING
+      e_tab_ev_acbal_ext = l_tab_ev_acbal_ext
+    EXCEPTIONS
+      no_input           = 1
+      id_not_initial     = 2
+      append_failed      = 3
+      OTHERS             = 99.
+  IF sy-subrc <> 0.
+    c_rc = 2.
+    MESSAGE e898(bca_basis) WITH u_iban TEXT-f07 INTO l_dummy.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+  IF l_tab_ev_acbal_ext IS INITIAL.
+    c_rc = 2.
+    MESSAGE e898(bca_basis) WITH u_iban TEXT-f08 INTO l_dummy.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+  READ TABLE l_tab_ev_acbal_ext INDEX 1 INTO l_str_ev_acbal_ext.
+  MESSAGE i010(0t) INTO l_dummy
+    WITH u_iban TEXT-f04 l_str_ev_acbal_ext-next_date space.
+  mac_log_msg sy-msgty sy-msgid sy-msgno
+    sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  l_str_ev_acbal_ext-contract_int = l_str_ev_acbal_new-contract_int.
+***************************************************************
+* Set BDC Events (also updates global buffer of BCA_CN_PER_ACBAL)
+***************************************************************
+  CALL FUNCTION 'BCA_API_EV_ACBAL_SET_BDC'
+    EXPORTING
+      i_contract_int    = l_str_ev_acbal_ext-contract_int
+      i_settlement_type = l_str_ev_acbal_ext-settlement_type
+    EXCEPTIONS
+      OTHERS            = 99.
+  IF sy-subrc <> 0.
+    c_rc = 2.
+    MESSAGE e898(bca_basis) WITH u_iban TEXT-f09 INTO l_dummy.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+**********************************************************************************
+*       do recalc nextdate
+**********************************************************************************
+  CALL FUNCTION 'BCA_API_EV_ACBAL_SET'
+    EXPORTING
+      i_contract_int            = l_str_ev_acbal_ext-contract_int
+      i_settlement_type         = l_str_ev_acbal_ext-settlement_type
+      i_settl                   = abap_true
+      i_take_calc_values_uncond = abap_false
+      i_no_recalculation        = abap_false
+      i_force_recalc_on_change  = ' '
+    EXCEPTIONS
+      OTHERS                    = 99.
+  IF sy-subrc <> 0.
+    c_rc = 2.
+    MESSAGE e898(bca_basis) WITH u_iban TEXT-f11 INTO l_dummy.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+***************************************************************
+* Save Events
+***************************************************************
+  IF u_flg_simulation IS INITIAL. " Real run.
+    CALL FUNCTION 'BCA_API_EV_ACBAL_SAVE'
+      EXPORTING
+        i_contract_int    = l_str_ev_acbal_ext-contract_int
+        i_xin_update_task = abap_true
+      EXCEPTIONS
+        OTHERS            = 99.
+    IF sy-subrc <> 0.
+      c_rc = 2.
+      MESSAGE e898(bca_basis) WITH u_iban TEXT-f12 INTO l_dummy.
+      mac_log_msg sy-msgty sy-msgid sy-msgno
+        sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      RETURN.
+    ENDIF.
+  ENDIF.
+ENDFORM.                    " CREATE_SETTL_EVENT
+*&---------------------------------------------------------------------*
+*&      Form  EARMARK_PD
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->U_CONTRACT_INT  text
+*      -->U_DATE_FROM  text
+*      -->U_EXEC_DATE  text
+*      -->U_FLG_SIMULATION  text
+*      <--C_RC  text
+*----------------------------------------------------------------------*
+FORM earmark_pd
+  USING
+    u_contract_int   TYPE bca_dte_contract_int
+    u_iban           TYPE bca_dte_iban
+    u_value_date     TYPE bca_valdat_y
+    u_str_param      TYPE t_str_pp_own_param
+    u_flg_simulation TYPE bank_boolean
+  CHANGING
+    c_rc             LIKE sy-subrc.
+  DATA:
+    l_str_clearing TYPE bca_str_cn_ca_acct,
+    l_tab_item     TYPE /fspd/tab_item,
+    l_rc           TYPE sysubrc,
+    l_dummy(1)     TYPE c.                                  "#EC NEEDED
+
+  CLEAR c_rc.
+  CALL FUNCTION 'BCA_API_CN_BCCA_GET'
+    EXPORTING
+      i_contract_int   = u_contract_int
+    IMPORTING
+      e_str_cn_ca_acct = l_str_clearing
+    EXCEPTIONS
+      internal_error   = 1
+      OTHERS           = 2.
+  IF sy-subrc <> 0.
+    c_rc = 2.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+  PERFORM fill_tab
+    USING
+      l_str_clearing
+      abap_false
+      u_value_date
+    CHANGING
+      l_tab_item
+      l_rc.
+  IF l_rc <> 0.
+    c_rc = l_rc.
+    RETURN.
+  ENDIF.
+  PERFORM save_pd_workload
+    USING
+      u_contract_int
+      u_iban
+      l_tab_item
+      u_str_param
+      u_flg_simulation
+    CHANGING
+      l_rc.
+  IF l_rc <> 0.
+    c_rc = l_rc.
+    RETURN.
+  ENDIF.
+ENDFORM.
+*----------------------------------------------------------------------*
+*      Form fill_tab
+*----------------------------------------------------------------------*
+FORM fill_tab
+  USING
+    u_str_clearing TYPE bca_str_cn_ca_acct
+    u_auth_check   TYPE bank_dte_auth_check
+    u_value_date   TYPE bca_valdat_y
+  CHANGING
+    c_tab_item     TYPE /fspd/tab_item
+    c_rc           TYPE sysubrc.
+  DATA:
+    l_str_group_key TYPE /fspd/str_group_key,
+    l_tas_item      TYPE /fspd/tas_item_data,
+    l_dummy(1)      TYPE c.                                 "#EC NEEDED
+
+  REFRESH c_tab_item.
+  CLEAR c_rc.
+  IF /fspd/cl_al_authority_check=>s_check_authority(
+       i_activity   = /fspd/if_constants=>con_activity_display
+       i_auth_check = u_auth_check ) = abap_true.
+    c_rc = 2.
+    MESSAGE e202(/fspd/al_item_msg) INTO l_dummy.
+    mac_log_msg sy-msgty sy-msgid sy-msgno
+      sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+  l_str_group_key-ref_appl = /fspd/if_constants=>con_ref_appl_acct.
+  l_str_group_key-group_object = u_str_clearing-clrng_acnum_int.
+  /fspd/cl_al_item=>s_get_list_by_grp_obj_display(
+    EXPORTING
+      i_str_item_group_object = l_str_group_key
+      i_flg_ignore_buffer     = abap_true
+      i_flg_old_state         = abap_false
+      i_flg_ignore_db         = abap_false
+    IMPORTING
+      e_tas_item              = l_tas_item ).
+  c_tab_item = l_tas_item.
+  "Only process the processed items
+  DELETE c_tab_item
+    WHERE status <> /fspd/if_item_constants=>con_pdi_status_done
+      AND status <> /fspd/if_item_constants=>con_pdi_status_postprocess
+      AND status <> /fspd/if_item_constants=>con_pdi_status_part_reversed.
+  "Only process the items on or after the value date specified.
+  DELETE c_tab_item WHERE date_value < u_value_date.
+  IF NOT c_tab_item[] IS INITIAL.
+    c_rc = 0.
+  ELSE.
+    c_rc = 1.
+  ENDIF.
+ENDFORM.                    " fill_tab
+*----------------------------------------------------------------------*
+*      Form save_pd_workload
+*----------------------------------------------------------------------*
+FORM save_pd_workload
+  USING
+    u_contract_int   TYPE bca_dte_contract_int
+    u_iban           TYPE bca_dte_iban
+    u_tab_item       TYPE /fspd/tab_item
+    u_str_param      TYPE t_str_pp_own_param
+    u_flg_simulation TYPE bank_boolean
+  CHANGING
+    c_rc       TYPE sysubrc.
+  DATA:
+    l_lines    TYPE sytfill,
+    l_guid_32  TYPE guid_32,
+    l_msgv2    TYPE symsgv,
+    l_msgv4    TYPE symsgv,
+    l_dummy(1) TYPE c.                                      "#EC NEEDED
+  DATA:
+    l_str_pditemtoberev TYPE zpditemtoberev,
+    l_tab_pditemtoberev TYPE STANDARD TABLE OF zpditemtoberev.
+  FIELD-SYMBOLS:
+    <l_str_item> TYPE /fspd/str_item_data.
+
+  CLEAR c_rc.
+  LOOP AT u_tab_item ASSIGNING <l_str_item>.
+    MOVE-CORRESPONDING <l_str_item> TO l_str_pditemtoberev. "#EC ENHOK
+    l_str_pditemtoberev-client = sy-mandt.
+    l_str_pditemtoberev-runid = u_str_param-runid.
+    l_str_pditemtoberev-contract_int = u_contract_int.
+    APPEND l_str_pditemtoberev TO l_tab_pditemtoberev.
+  ENDLOOP.
+  SORT l_tab_pditemtoberev BY runid contract_int item_id.
+  IF u_flg_simulation = space.
+    CALL FUNCTION 'ZYHW_UPDATE_ZPDITEMTOBEREV' IN UPDATE TASK
+      TABLES
+        t_tab_pditemtoberev_ins = l_tab_pditemtoberev.
+  ENDIF.
+  l_lines = lines( l_tab_pditemtoberev ).
+  WRITE l_lines TO l_msgv2 LEFT-JUSTIFIED.
+  l_msgv4 = TEXT-f18.
+  l_guid_32 = u_str_param-runid.
+  REPLACE '&1' IN l_msgv4 WITH l_guid_32.
+  MESSAGE s010(0t) WITH u_iban l_msgv2 TEXT-f17 l_msgv4 INTO l_dummy.
+  mac_log_msg sy-msgty sy-msgid sy-msgno
+    sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+ENDFORM.                     " save_pd_workload

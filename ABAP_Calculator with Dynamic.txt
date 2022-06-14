@@ -1,0 +1,186 @@
+*&---------------------------------------------------------------------*
+*& Report  ZCALCULATOR_ANDREW
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT ZCALCULATOR_ANDREW.
+
+DATA:gv_res TYPE p DECIMALS 3.
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE text-h01.
+
+PARAMETERS:p_i1 TYPE i,
+
+           p_i2 TYPE i.
+
+           "p_i3 TYPE i.
+
+*           seprt TYPE c.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN: BEGIN OF LINE,
+
+                PUSHBUTTON 42(5) push USER-COMMAND f1,
+
+                PUSHBUTTON 48(5) push1 USER-COMMAND f2.
+
+SELECTION-SCREEN  END OF LINE.
+
+SELECTION-SCREEN: BEGIN OF LINE,
+
+              PUSHBUTTON 42(5) push2 USER-COMMAND f3,
+
+              PUSHBUTTON 48(5) push3 USER-COMMAND f4.
+
+SELECTION-SCREEN  END OF LINE.
+
+SELECTION-SCREEN: BEGIN OF LINE,
+
+  PUSHBUTTON 45(5) push4 USER-COMMAND f5.
+
+SELECTION-SCREEN  END OF LINE.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE text-h02.
+
+PARAMETERS:old_res TYPE p,
+
+           op TYPE c,
+
+           p_i3 TYPE i,
+
+           result TYPE p DEFAULT gv_res.
+
+.
+
+SELECTION-SCREEN END OF BLOCK b2.
+
+INITIALIZATION.
+
+  push = '+'.
+
+  push1 = '-'.
+
+  push2 = '*'.
+
+  push3 = '/'.
+
+  push4 = '='.
+
+AT SELECTION-SCREEN.
+
+  CASE sy-ucomm.
+
+    WHEN 'F1'.
+
+      op = '+'.
+
+      IF gv_res = space.
+
+        gv_res = p_i1 + p_i2.
+
+      ELSE.
+
+        old_res = result.
+
+        CLEAR result.
+
+        gv_res = p_i3  + gv_res.
+
+      ENDIF.
+
+    WHEN 'F2'.
+
+      op = '-'.
+
+      IF gv_res = space.
+
+        gv_res = p_i1 - p_i2.
+
+      ELSE.
+
+*        CLEAR p_i2.
+
+*         CLEAR p_i1.
+
+        old_res = result.
+
+        CLEAR result.
+
+        gv_res = gv_res - p_i3.
+
+      ENDIF.
+
+    WHEN 'F3'.
+
+      op = '*'.
+
+      IF gv_res = space.
+
+        gv_res = p_i1 * p_i2.
+
+      ELSE.
+
+*        CLEAR p_i2.
+
+*         CLEAR p_i1.
+
+        old_res = result.
+
+        CLEAR result.
+
+        gv_res = gv_res * p_i3.
+
+      ENDIF.
+
+    WHEN 'F4'.
+
+      op = '/'.
+
+      IF gv_res = space.
+
+        gv_res = p_i1 / p_i2.
+
+      ELSE.
+
+*        CLEAR p_i2.
+
+*         CLEAR p_i1.
+
+        old_res = result.
+
+        CLEAR result.
+
+        gv_res = gv_res /  p_i3.
+
+      ENDIF.
+
+    WHEN 'F5'.
+
+      CLEAR op.
+
+      CLEAR p_i2.
+
+      CLEAR p_i1.
+
+      result = gv_res.
+
+  ENDCASE.
+
+*process to run this code
+
+*  input data:  give any numeric values for p_i1 & p_i2.
+
+*                   then press any one of the operators(+,-,*,/)
+
+*                   then press  = button.
+
+*                  if you want few more operation then give input value foe p_i3.
+
+*                  press operator.
+
+*                  follow the similar steps to perform required number of operations.
+
+

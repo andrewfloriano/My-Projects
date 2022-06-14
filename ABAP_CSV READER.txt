@@ -1,0 +1,88 @@
+
+*&---------------------------------------------------------------------*
+*& Report  ZREPORT_READ_KPI_ANDREW
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT ZREPORT_READ_KPI_ANDREW.
+
+TYPES: BEGIN OF ttab,
+  rec(1000) TYPE c,
+END OF ttab.
+
+TYPES: BEGIN OF tdat,
+  fld1(10) TYPE c,
+  fld2(10) TYPE c,
+  fld3(10) TYPE c, ""
+END OF tdat.
+
+DATA: itab TYPE TABLE OF ttab WITH HEADER LINE.
+DATA: idat TYPE TABLE OF tdat WITH HEADER LINE.
+
+"---------------------------------------------------------------------------------------------
+DATA: file_str TYPE string.
+
+PARAMETERS: UP_ARQ TYPE localfile.
+"---------------------------------------------------------------------------------------------
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR UP_ARQ.
+
+"Function Module to build a F4 help for File path"
+
+  CALL FUNCTION 'KD_GET_FILENAME_ON_F4'
+    EXPORTING
+      static    = 'X'
+    CHANGING
+      file_name = UP_ARQ.
+
+START-OF-SELECTION.
+
+  file_str = UP_ARQ.
+
+"---------------------------------------------------------------------------------------------
+
+"GUI_UPLOAD, FUNCTION TO UPLOAD THE FILE"
+
+  CALL FUNCTION 'GUI_UPLOAD'
+    EXPORTING
+      filename                = file_str
+    TABLES
+      data_tab                = itab
+    EXCEPTIONS
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      OTHERS                  = 17.
+
+"---------------------------------------------------------------------------------------------
+
+  LOOP AT itab.
+
+    CLEAR idat.
+    SPLIT itab-rec AT ',' INTO idat-fld1
+    idat-fld2
+    idat-fld3.
+    APPEND idat.
+
+  ENDLOOP.
+
+  LOOP AT idat. "WRITE"
+
+    WRITE:/ idat-fld1, idat-fld2, idat-fld3.
+
+  ENDLOOP.
